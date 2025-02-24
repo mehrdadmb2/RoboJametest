@@ -33,7 +33,7 @@ conn.commit()
 bot = Application.builder().token(TOKEN).build()
 
 # یک آی‌دی برای ادمین (برای مثال: آی‌دی خودتان)
-ADMIN_ID = 381200756  # مقدار این متغیر را به آی‌دی تلگرام خود تغییر دهید
+ADMIN_ID = 381200758  # مقدار این متغیر را به آی‌دی تلگرام خود تغییر دهید
 
 async def start(update: Update, context: CallbackContext) -> None:
     """دستور /start برای خوش‌آمدگویی"""
