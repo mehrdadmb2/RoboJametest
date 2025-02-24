@@ -118,6 +118,7 @@ async def show_data(update: Update, context: CallbackContext) -> None:
                 f"👤 <b>UserID:</b> {row[0]}\n"
                 f"🗣 <b>Username:</b> {row[1] if row[1] else 'نامشخص'}\n"
                 f"💬 <b>Message:</b> {row[3]}\n"
+                f"💡 <b>ChatID:</b> {row[2]}\n"
                 f"🕒 <b>Date:</b> {row[4]}\n"
                 "-----------------------------------\n"
             )
