@@ -1,3 +1,4 @@
+import os
 import logging
 import sqlite3
 from telegram import Update
@@ -21,8 +22,10 @@ cursor.execute("""
 """)
 conn.commit()
 
-# مقداردهی اولیه بات
-TOKEN = "YOUR_BOT_TOKEN"
+# دریافت توکن از متغیر محیطی
+TOKEN = os.getenv("TOKEN")
+print("TOKEN:", TOKEN)  # برای دیباگ، حذفش کن بعداً
+
 bot = Application.builder().token(TOKEN).build()
 
 async def start(update: Update, context: CallbackContext) -> None:
