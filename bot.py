@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 import logging
 import sqlite3
 from telegram import Update
@@ -63,116 +62,15 @@ async def help_command(update: Update, context: CallbackContext) -> None:
         "➖ <b>/start</b>: خوش‌آمدگویی و معرفی ربات.\n"
         "➖ <b>/help</b>: نمایش راهنما و لیست دستورات.\n"
         "➖ <b>/show_data</b>: نمایش تمامی پیام‌های ثبت‌شده (فقط برای ادمین).\n"
-        "➖ <b>/stats</b>: نمایش آمار کلی ربات (فقط ادمین).\n"
-        "➖ <b>/backup</b>: دریافت فایل پشتیبان از دیتابیس (فقط ادمین).\n"
         "➖ <b>/reply</b>: فعال‌سازی حالت ریپلای (تنها ادمین)؛ پیام بعدی ادمین متن ریپلای خواهد شد.\n"
         "➖ <b>/endreply</b>: پایان حالت ریپلای (تنها ادمین).\n\n"
         "➖ <b>/add_admin [user_id یا @username]</b>: اضافه کردن یک ادمین جدید (فقط توسط ادمین‌ها).\n"
         "➖ <b>/remove_admin [user_id یا @username]</b>: حذف یک ادمین (فقط توسط ادمین‌ها؛ ادمین اصلی قابل حذف نیست).\n"
         "➖ <b>/list_admins</b>: نمایش لیست ادمین‌های ثبت‌شده.\n\n"
-        "💡 برای بازگردانی دیتابیس، فایل دیتابیس را به ربات ارسال کنید (فقط ادمین)."
+        "💡 در حالت ریپلای، هر پیام جدید در چت با متن ریپلای تنظیم شده به پیام کاربر ریپلای می‌شود."
     )
     await update.message.reply_text(help_text, parse_mode=ParseMode.HTML)
 
-# زمان شروع ربات (در متغیر گلوبال)
-start_time = datetime.now()
-
-async def stats_command(update: Update, context: CallbackContext) -> None:
-    """نمایش آمار کلی ربات"""
-    if update.message.from_user.id not in admins:
-        await update.message.reply_text("❌ شما اجازه دسترسی به این دستور را ندارید.")
-        return
-
-    # محاسبه زمان فعالیت ربات
-    uptime = datetime.now() - start_time
-    days = uptime.days
-    hours, remainder = divmod(uptime.seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    uptime_str = f"{days} روز, {hours} ساعت, {minutes} دقیقه, {seconds} ثانیه"
-
-    # تعداد پیام‌ها
-    cursor.execute("SELECT COUNT(*) FROM messages")
-    total_messages = cursor.fetchone()[0]
-
-    # تعداد کاربران منحصر به فرد
-    cursor.execute("SELECT COUNT(DISTINCT user_id) FROM messages")
-    unique_users = cursor.fetchone()[0]
-
-    # تعداد چت‌های منحصر به فرد
-    cursor.execute("SELECT COUNT(DISTINCT chat_id) FROM messages")
-    unique_chats = cursor.fetchone()[0]
-
-    # آخرین فعالیت
-    cursor.execute("SELECT MAX(date) FROM messages")
-    last_activity = cursor.fetchone()[0] or "هنوز فعالیتی ثبت نشده"
-
-    response = (
-        "📊 <b>آمار کلی ربات:</b>\n\n"
-        f"⏳ <b>زمان فعالیت:</b> {uptime_str}\n"
-        f"📨 <b>تعداد پیام‌ها:</b> {total_messages}\n"
-        f"👥 <b>کاربران منحصر به فرد:</b> {unique_users}\n"
-        f"💬 <b>چت‌های منحصر به فرد:</b> {unique_chats}\n"
-        f"🕒 <b>آخرین فعالیت ثبت شده:</b> {last_activity}"
-    )
-    
-    await update.message.reply_text(response, parse_mode=ParseMode.HTML)
-async def restore_command(update: Update, context: CallbackContext) -> None:
-    """دریافت و بازگردانی فایل پشتیبان"""
-    if update.message.from_user.id not in admins:
-        await update.message.reply_text("❌ شما اجازه دسترسی به این دستور را ندارید.")
-        return
-
-    if not update.message.document:
-        await update.message.reply_text("❌ لطفاً یک فایل دیتابیس (.db) ارسال کنید.")
-        return
-
-    file = await context.bot.get_file(update.message.document)
-    filename = update.message.document.file_name
-    
-    if not filename.endswith('.db'):
-        await update.message.reply_text("❌ فرمت فایل نامعتبر است. لطفاً فایل .db ارسال کنید.")
-        return
-
-    # دانلود فایل
-    await file.download_to_drive(f"restore_{filename}")
-    
-    # جایگزینی دیتابیس
-    import shutil
-    try:
-        conn.close()
-        shutil.copy2(f"restore_{filename}", "bot_data.db")
-        await update.message.reply_text("✅ دیتابیس با موفقیت بازگردانی شد!")
-    except Exception as e:
-        await update.message.reply_text(f"❌ خطا در بازگردانی: {str(e)}")
-    finally:
-        # باز کردن مجدد اتصال
-        global conn, cursor
-        conn = sqlite3.connect("bot_data.db", check_same_thread=False)
-        cursor = conn.cursor()
-async def backup_command(update: Update, context: CallbackContext) -> None:
-    """ارسال فایل پشتیبان از دیتابیس"""
-    if update.message.from_user.id not in admins:
-        await update.message.reply_text("❌ شما اجازه دسترسی به این دستور را ندارید.")
-        return
-
-    # ایجاد بکاپ
-    backup_filename = "bot_data_backup.db"
-    conn.commit()  # ذخیره تغییرات اخیر
-    conn.close()   # بستن اتصال برای کپی ایمن
-    
-    import shutil
-    shutil.copy2("bot_data.db", backup_filename)
-    
-    # باز کردن مجدد اتصال
-    global conn, cursor
-    conn = sqlite3.connect("bot_data.db", check_same_thread=False)
-    cursor = conn.cursor()
-    
-    # ارسال فایل
-    await update.message.reply_document(
-        document=open(backup_filename, 'rb'),
-        caption="🔐 فایل پشتیبان دیتابیس"
-    )
 async def handle_message(update: Update, context: CallbackContext) -> None:
     """
     ذخیره پیام‌ها در دیتابیس و در صورت فعال بودن حالت ریپلای،
@@ -332,10 +230,6 @@ bot.add_handler(CommandHandler("add_admin", add_admin))
 bot.add_handler(CommandHandler("remove_admin", remove_admin))
 bot.add_handler(CommandHandler("list_admins", list_admins))
 bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-# اضافه کردن دستورات جدید به بخش ثبت هندلرها
-bot.add_handler(CommandHandler("stats", stats_command))
-bot.add_handler(CommandHandler("backup", backup_command))
-bot.add_handler(MessageHandler(filters.Document.ALL, restore_command))
 
 # اجرای ربات
 if __name__ == "__main__":
