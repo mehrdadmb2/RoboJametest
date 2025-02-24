@@ -35,8 +35,9 @@ conn.commit()
 # ساخت ربات
 bot = Application.builder().token(TOKEN).build()
 
-# لیست ادمین‌ها (ادمین اولیه)
-admins = {381200758}
+# تعیین ادمین اصلی (که قابل حذف نیست) و لیست ادمین‌ها
+MAIN_ADMIN_ID = 381200758
+admins = {MAIN_ADMIN_ID}
 
 async def start(update: Update, context: CallbackContext) -> None:
     """دستور /start برای خوش‌آمدگویی"""
@@ -50,7 +51,7 @@ async def start(update: Update, context: CallbackContext) -> None:
         "🔹 /endreply : پایان حالت ریپلای\n\n"
         "برای مدیریت ادمین‌ها:\n"
         "🔸 /add_admin [user_id یا @username]\n"
-        "🔸 /remove_admin [user_id یا @username]\n"
+        "🔸 /remove_admin [user_id یا @username] (ادمین اصلی قابل حذف نیست)\n"
         "🔸 /list_admins : نمایش ادمین‌های فعلی"
     )
 
@@ -64,16 +65,16 @@ async def help_command(update: Update, context: CallbackContext) -> None:
         "➖ <b>/reply</b>: فعال‌سازی حالت ریپلای (تنها ادمین)؛ پیام بعدی ادمین متن ریپلای خواهد شد.\n"
         "➖ <b>/endreply</b>: پایان حالت ریپلای (تنها ادمین).\n\n"
         "➖ <b>/add_admin [user_id یا @username]</b>: اضافه کردن یک ادمین جدید (فقط توسط ادمین‌ها).\n"
-        "➖ <b>/remove_admin [user_id یا @username]</b>: حذف یک ادمین (فقط توسط ادمین‌ها).\n"
+        "➖ <b>/remove_admin [user_id یا @username]</b>: حذف یک ادمین (فقط توسط ادمین‌ها؛ ادمین اصلی قابل حذف نیست).\n"
         "➖ <b>/list_admins</b>: نمایش لیست ادمین‌های ثبت‌شده.\n\n"
-        "💡 در حالت ریپلای، هر پیام جدید در چت با متن ریپلای تنظیم شده پاسخ داده می‌شود."
+        "💡 در حالت ریپلای، هر پیام جدید در چت با متن ریپلای تنظیم شده به پیام کاربر ریپلای می‌شود."
     )
     await update.message.reply_text(help_text, parse_mode=ParseMode.HTML)
 
 async def handle_message(update: Update, context: CallbackContext) -> None:
     """
     ذخیره پیام‌ها در دیتابیس و در صورت فعال بودن حالت ریپلای،
-    ارسال ریپلای به پیام‌ها.
+    ارسال ریپلای دقیق به پیام‌ها.
     اگر در حالت تنظیم ریپلای (awaiting_reply_text) هستیم و پیام از ادمین است،
     آن پیام به عنوان متن ریپلای ذخیره می‌شود.
     """
@@ -95,14 +96,17 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
     """, (user.id, user.username, chat_id, message, date))
     conn.commit()
 
-    # در صورتی که حالت ریپلای فعال باشد، به پیام‌ها ریپلای ارسال می‌شود
+    # در صورتی که حالت ریپلای فعال باشد، به پیام‌ها به صورت ریپلای دقیق پاسخ داده می‌شود
     if "reply_text" in context.chat_data:
-        await update.message.reply_text(context.chat_data["reply_text"])
+        await update.message.reply_text(
+            context.chat_data["reply_text"],
+            reply_to_message_id=update.message.message_id
+        )
 
 async def show_data(update: Update, context: CallbackContext) -> None:
     """
     نمایش تمامی پیام‌های ثبت شده - فقط برای ادمین.
-    اگر دستور از چت گروه یا کانال ارسال شود، خروجی به صورت خصوصی برای ادمین ارسال می‌شود.
+    اگر دستور از چت گروه یا کانال ارسال شود، خروجی به صورت خصوصی به ادمین ارسال می‌شود.
     """
     user = update.message.from_user
     if user.id not in admins:
@@ -131,7 +135,6 @@ async def show_data(update: Update, context: CallbackContext) -> None:
             )
 
     if update.message.chat.type != "private":
-        # ارسال به صورت خصوصی به ادمین
         await context.bot.send_message(chat_id=user.id, text=response, parse_mode=ParseMode.HTML)
         await update.message.reply_text("✅ داده‌ها به پیام خصوصی ارسال شدند.")
     else:
@@ -168,13 +171,16 @@ async def add_admin(update: Update, context: CallbackContext) -> None:
 
     admin_input = context.args[0].strip()
     try:
-        # سعی می‌کنیم آن را به عدد تبدیل کنیم (user_id)
-        new_admin_id = int(admin_input)
+        new_admin = int(admin_input)
     except ValueError:
-        # اگر نتوانستیم به عدد تبدیل کنیم، فرض می‌کنیم یوزرنیم است (بدون @)
-        new_admin_id = admin_input.lstrip("@")
+        new_admin = admin_input.lstrip("@")
 
-    admins.add(new_admin_id)
+    # جلوگیری از حذف یا اضافه کردن مجدد ادمین اصلی
+    if new_admin == MAIN_ADMIN_ID:
+        await update.message.reply_text("❌ ادمین اصلی نمی‌تواند تغییر کند.")
+        return
+
+    admins.add(new_admin)
     await update.message.reply_text(f"✅ کاربر {admin_input} به عنوان ادمین اضافه شد.")
 
 async def remove_admin(update: Update, context: CallbackContext) -> None:
@@ -189,12 +195,16 @@ async def remove_admin(update: Update, context: CallbackContext) -> None:
 
     admin_input = context.args[0].strip()
     try:
-        rem_admin_id = int(admin_input)
+        rem_admin = int(admin_input)
     except ValueError:
-        rem_admin_id = admin_input.lstrip("@")
+        rem_admin = admin_input.lstrip("@")
 
-    if rem_admin_id in admins:
-        admins.remove(rem_admin_id)
+    if rem_admin == MAIN_ADMIN_ID:
+        await update.message.reply_text("❌ ادمین اصلی قابل حذف نیست.")
+        return
+
+    if rem_admin in admins:
+        admins.remove(rem_admin)
         await update.message.reply_text(f"✅ کاربر {admin_input} از لیست ادمین‌ها حذف شد.")
     else:
         await update.message.reply_text("ℹ️ این کاربر در لیست ادمین‌ها موجود نیست.")
