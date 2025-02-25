@@ -180,18 +180,32 @@ async def add_admin(update: Update, context: CallbackContext) -> None:
         return
 
     admin_input = context.args[0].strip()
-    try:
-        new_admin = int(admin_input)
-    except ValueError:
-        new_admin = admin_input.lstrip("@")
+    
+    # اگر ورودی با @ شروع شود، از get_chat برای دریافت آیدی عددی استفاده می‌کنیم
+    if admin_input.startswith('@'):
+        try:
+            chat = await context.bot.get_chat(admin_input)
+            new_admin = chat.id
+        except Exception as e:
+            await update.message.reply_text(f"❌ خطا در دریافت آیدی کاربر: {e}")
+            return
+    else:
+        try:
+            new_admin = int(admin_input)
+        except ValueError:
+            await update.message.reply_text("❌ مقدار ورودی نامعتبر است.")
+            return
 
-    # جلوگیری از حذف یا اضافه کردن مجدد ادمین اصلی
     if new_admin == MAIN_ADMIN_ID:
         await update.message.reply_text("❌ ادمین اصلی نمی‌تواند تغییر کند.")
         return
 
-    admins.add(new_admin)
-    await update.message.reply_text(f"✅ کاربر {admin_input} به عنوان ادمین اضافه شد.")
+    if new_admin in admins:
+        await update.message.reply_text("ℹ️ این کاربر قبلاً به عنوان ادمین اضافه شده است.")
+    else:
+        admins.add(new_admin)
+        await update.message.reply_text(f"✅ کاربر {new_admin} به عنوان ادمین اضافه شد.")
+
 
 async def remove_admin(update: Update, context: CallbackContext) -> None:
     """حذف یک ادمین (تنها توسط ادمین‌های فعلی مجاز)"""
@@ -204,10 +218,20 @@ async def remove_admin(update: Update, context: CallbackContext) -> None:
         return
 
     admin_input = context.args[0].strip()
-    try:
-        rem_admin = int(admin_input)
-    except ValueError:
-        rem_admin = admin_input.lstrip("@")
+    
+    if admin_input.startswith('@'):
+        try:
+            chat = await context.bot.get_chat(admin_input)
+            rem_admin = chat.id
+        except Exception as e:
+            await update.message.reply_text(f"❌ خطا در دریافت آیدی کاربر: {e}")
+            return
+    else:
+        try:
+            rem_admin = int(admin_input)
+        except ValueError:
+            await update.message.reply_text("❌ مقدار ورودی نامعتبر است.")
+            return
 
     if rem_admin == MAIN_ADMIN_ID:
         await update.message.reply_text("❌ ادمین اصلی قابل حذف نیست.")
@@ -215,9 +239,10 @@ async def remove_admin(update: Update, context: CallbackContext) -> None:
 
     if rem_admin in admins:
         admins.remove(rem_admin)
-        await update.message.reply_text(f"✅ کاربر {admin_input} از لیست ادمین‌ها حذف شد.")
+        await update.message.reply_text(f"✅ کاربر {rem_admin} از لیست ادمین‌ها حذف شد.")
     else:
         await update.message.reply_text("ℹ️ این کاربر در لیست ادمین‌ها موجود نیست.")
+
 
 async def list_admins(update: Update, context: CallbackContext) -> None:
     if not admins:
