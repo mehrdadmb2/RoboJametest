@@ -1,6 +1,8 @@
 import os
 import logging
 import sqlite3
+import shutil
+from datetime import datetime
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -215,6 +217,70 @@ async def list_admins(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("ℹ️ هیچ ادمینی ثبت نشده است.")
         return
 
+async def backup_db(update: Update, context: CallbackContext) -> None:
+    """ بکاپ‌گیری از دیتابیس """
+    if update.message.from_user.id not in admins:
+        await update.message.reply_text("❌ شما اجازه این کار را ندارید.")
+        return
+    backup_filename = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    shutil.copy(DB_PATH, backup_filename)
+    await update.message.reply_document(document=open(backup_filename, "rb"))
+    os.remove(backup_filename)
+
+async def restore_db(update: Update, context: CallbackContext) -> None:
+    """ ریستور دیتابیس بدون حذف داده‌های قبلی """
+    if update.message.from_user.id not in admins:
+        await update.message.reply_text("❌ شما اجازه این کار را ندارید.")
+        return
+    if not context.args:
+        await update.message.reply_text("❌ لطفاً فایل بکاپ را ارسال کنید.")
+        return
+    file = await context.bot.get_file(update.message.document.file_id)
+    file_path = "restore_temp.db"
+    await file.download_to_drive(file_path)
+
+    restore_conn = sqlite3.connect(file_path)
+    restore_cursor = restore_conn.cursor()
+    restore_cursor.execute("SELECT * FROM messages")
+    rows = restore_cursor.fetchall()
+    restore_conn.close()
+
+    for row in rows:
+        cursor.execute("""
+            INSERT INTO messages (user_id, username, chat_id, message, date)
+            VALUES (?, ?, ?, ?, ?)
+        """, row[1:])
+    conn.commit()
+    os.remove(file_path)
+    await update.message.reply_text("✅ داده‌ها با موفقیت بازیابی شدند.")
+
+async def stats(update: Update, context: CallbackContext) -> None:
+    """ نمایش آمار کلی ربات """
+    cursor.execute("SELECT COUNT(*) FROM messages")
+    total_messages = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(DISTINCT user_id) FROM messages")
+    unique_users = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT user_id, username, COUNT(*) as msg_count FROM messages GROUP BY user_id ORDER BY msg_count DESC LIMIT 5")
+    top_users = cursor.fetchall()
+    
+    bot_start_time = os.path.getctime(DB_PATH)
+    uptime = datetime.now() - datetime.fromtimestamp(bot_start_time)
+    
+    stats_text = (
+        f"📊 <b>آمار کلی ربات</b>\n\n"
+        f"📝 <b>تعداد کل پیام‌ها:</b> {total_messages}\n"
+        f"👥 <b>تعداد کاربران منحصربه‌فرد:</b> {unique_users}\n"
+        f"⏳ <b>مدت زمان فعال بودن ربات:</b> {uptime.days} روز، {uptime.seconds // 3600} ساعت"
+    )
+    if top_users:
+        stats_text += "\n🏆 <b>۵ کاربر برتر:</b>\n"
+        for user in top_users:
+            stats_text += f"{user[1] if user[1] else user[0]} - {user[2]} پیام\n"
+    
+    await update.message.reply_text(stats_text, parse_mode=ParseMode.HTML)
+    
     response = "👥 <b>لیست ادمین‌ها:</b>\n\n"
     for admin in admins:
         response += f"• {admin}\n"
@@ -230,6 +296,9 @@ bot.add_handler(CommandHandler("add_admin", add_admin))
 bot.add_handler(CommandHandler("remove_admin", remove_admin))
 bot.add_handler(CommandHandler("list_admins", list_admins))
 bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+bot.add_handler(CommandHandler("backup", backup_db))
+bot.add_handler(CommandHandler("restore", restore_db))
+bot.add_handler(CommandHandler("stats", stats))
 
 # اجرای ربات
 if __name__ == "__main__":
