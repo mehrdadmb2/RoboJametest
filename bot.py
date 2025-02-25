@@ -42,7 +42,8 @@ bot = Application.builder().token(TOKEN).build()
 
 # تعیین ادمین اصلی (که قابل حذف نیست) و لیست ادمین‌ها
 MAIN_ADMIN_ID = 381200758
-admins = {MAIN_ADMIN_ID}
+admins = {MAIN_ADMIN_ID, 1156819072}  # در اینجا آیدی‌های جدید را اضافه کنید
+
 
 async def start(update: Update, context: CallbackContext) -> None:
     """دستور /start برای خوش‌آمدگویی"""
