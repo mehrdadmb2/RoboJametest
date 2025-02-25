@@ -215,10 +215,14 @@ async def remove_admin(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("ℹ️ این کاربر در لیست ادمین‌ها موجود نیست.")
 
 async def list_admins(update: Update, context: CallbackContext) -> None:
-    """نمایش لیست ادمین‌های ثبت شده"""
     if not admins:
         await update.message.reply_text("ℹ️ هیچ ادمینی ثبت نشده است.")
         return
+    response = "👥 <b>لیست ادمین‌ها:</b>\n\n"
+    for admin in admins:
+        response += f"• {admin}\n"
+    await update.message.reply_text(response, parse_mode=ParseMode.HTML)
+
 
 async def backup_db(update: Update, context: CallbackContext) -> None:
     """ بکاپ‌گیری از دیتابیس """
@@ -231,16 +235,17 @@ async def backup_db(update: Update, context: CallbackContext) -> None:
     os.remove(backup_filename)
 
 async def restore_db(update: Update, context: CallbackContext) -> None:
-    """ ریستور دیتابیس بدون حذف داده‌های قبلی """
     if update.message.from_user.id not in admins:
         await update.message.reply_text("❌ شما اجازه این کار را ندارید.")
         return
-    if not context.args:
-        await update.message.reply_text("❌ لطفاً فایل بکاپ را ارسال کنید.")
+    if not update.message.document:
+        await update.message.reply_text("❌ لطفاً فایل بکاپ را به عنوان داکیومنت ارسال کنید.")
         return
     file = await context.bot.get_file(update.message.document.file_id)
     file_path = "restore_temp.db"
     await file.download_to_drive(file_path)
+    # ادامه کد
+
 
     restore_conn = sqlite3.connect(file_path)
     restore_cursor = restore_conn.cursor()
