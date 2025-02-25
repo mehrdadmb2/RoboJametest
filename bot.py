@@ -19,6 +19,9 @@ TOKEN = os.getenv("TOKEN")
 if not TOKEN:
     raise ValueError("TOKEN is not set. Please set the TOKEN environment variable with your bot token.")
 
+
+DB_PATH = "bot_data.db"
+
 # اتصال به دیتابیس SQLite و ایجاد جدول در صورت عدم وجود
 conn = sqlite3.connect("bot_data.db", check_same_thread=False)
 cursor = conn.cursor()
