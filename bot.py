@@ -6,6 +6,7 @@ import re
 from datetime import datetime
 from telegram import Update
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, filters, CallbackContext
 )
@@ -146,19 +147,19 @@ async def help_command(update: Update, context: CallbackContext) -> None:
 
 async def handle_message(update: Update, context: CallbackContext) -> None:
     """
-    ذخیره پیام‌های دریافتی در دیتابیس و ارسال ریپلای در صورت فعال بودن حالت ریپلای.
+    Save incoming messages to the database and send a reply if reply mode is active.
     """
     if not update.message:
         return
     try:
-        # بررسی حالت ریپلای (تنها برای ادمین‌ها)
+        # Check if reply mode is active (only for admins)
         if context.chat_data.get("awaiting_reply_text") and update.message.from_user.id in admins:
             context.chat_data["reply_text"] = update.message.text
             context.chat_data.pop("awaiting_reply_text")
             await update.message.reply_text(f"✅ Reply mode activated.\nReply: {update.message.text}")
             return
 
-        # ذخیره پیام در دیتابیس
+        # Save message to database
         user = update.message.from_user
         chat_id = update.message.chat_id
         message_text = update.message.text
@@ -172,7 +173,7 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
         except Exception as db_error:
             logging.error(f"Database error while inserting message: {db_error}")
 
-        # ارسال ریپلای در صورت فعال بودن
+        # Send reply if reply mode is active
         if "reply_text" in context.chat_data:
             try:
                 await update.message.reply_text(
@@ -186,7 +187,7 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
 
 async def show_data(update: Update, context: CallbackContext) -> None:
     """
-    نمایش آخرین 50 پیام ثبت‌شده در دیتابیس (فقط برای ادمین‌ها).
+    Show the last 50 recorded messages from the database (admin only).
     """
     if not update.message:
         return
@@ -233,7 +234,7 @@ async def show_data(update: Update, context: CallbackContext) -> None:
 
 async def reply_command(update: Update, context: CallbackContext) -> None:
     """
-    فعال‌سازی حالت ریپلای برای ادمین‌ها؛ پیام بعدی به عنوان ریپلای ثبت خواهد شد.
+    Activate reply mode for admins; the next message will be used as the reply text.
     """
     if not update.message:
         return
@@ -245,7 +246,7 @@ async def reply_command(update: Update, context: CallbackContext) -> None:
 
 async def endreply_command(update: Update, context: CallbackContext) -> None:
     """
-    پایان حالت ریپلای برای ادمین‌ها.
+    Deactivate reply mode for admins.
     """
     if not update.message:
         return
@@ -260,7 +261,9 @@ async def endreply_command(update: Update, context: CallbackContext) -> None:
 
 async def add_admin(update: Update, context: CallbackContext) -> None:
     """
-    اضافه کردن یک ادمین جدید. فقط توسط ادمین‌های فعلی مجاز است.
+    Add a new admin. Only current admins can add a new admin.
+    Note: If the user has not interacted with the bot, retrieving their info via /get_chat may fail.
+          In such cases, please provide the numeric ID manually.
     """
     if not update.message:
         return
@@ -279,6 +282,14 @@ async def add_admin(update: Update, context: CallbackContext) -> None:
         try:
             chat = await context.bot.get_chat(admin_input)
             new_admin = chat.id
+        except BadRequest as e:
+            error_msg = str(e).lower()
+            if "chat not found" in error_msg:
+                await update.message.reply_text("❌ Chat not found. The user may not have started a conversation with the bot. Please provide the numeric ID instead.")
+                return
+            else:
+                await update.message.reply_text(f"❌ Error retrieving user ID: {e}")
+                return
         except Exception as e:
             await update.message.reply_text(f"❌ Error retrieving user ID: {e}")
             return
@@ -286,7 +297,7 @@ async def add_admin(update: Update, context: CallbackContext) -> None:
         try:
             new_admin = int(admin_input)
         except ValueError:
-            await update.message.reply_text("❌ Invalid input provided.")
+            await update.message.reply_text("❌ Invalid input provided. Please provide a numeric user ID or a username starting with '@'.")
             return
 
     if new_admin == MAIN_ADMIN_ID:
@@ -301,7 +312,7 @@ async def add_admin(update: Update, context: CallbackContext) -> None:
 
 async def remove_admin(update: Update, context: CallbackContext) -> None:
     """
-    حذف یک ادمین از لیست. تنها ادمین‌های فعلی مجاز به حذف هستند.
+    Remove an admin from the list. Only current admins can remove an admin.
     """
     if not update.message:
         return
@@ -342,7 +353,7 @@ async def remove_admin(update: Update, context: CallbackContext) -> None:
 
 async def list_admins(update: Update, context: CallbackContext) -> None:
     """
-    نمایش لیست ادمین‌های ثبت‌شده.
+    Show the list of registered admins.
     """
     if not update.message:
         return
@@ -357,7 +368,7 @@ async def list_admins(update: Update, context: CallbackContext) -> None:
 
 async def backup_db(update: Update, context: CallbackContext) -> None:
     """
-    بکاپ‌گیری از دیتابیس و ارسال فایل بکاپ به ادمین.
+    Create a backup of the database and send the backup file to the admin.
     """
     if not update.message:
         return
@@ -377,7 +388,8 @@ async def backup_db(update: Update, context: CallbackContext) -> None:
 
 async def restore_db(update: Update, context: CallbackContext) -> None:
     """
-    ریستور دیتابیس از فایل بکاپ ارسال‌شده.
+    Restore the database from a backup file sent as a document.
+    The backup file's data will be merged with the current data.
     """
     if not update.message:
         return
@@ -399,6 +411,14 @@ async def restore_db(update: Update, context: CallbackContext) -> None:
     try:
         restore_conn = sqlite3.connect(restore_file)
         restore_cursor = restore_conn.cursor()
+        # Check if the backup file has the expected table
+        restore_cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='messages'")
+        if not restore_cursor.fetchone():
+            await update.message.reply_text("❌ The backup file does not contain the required table.")
+            restore_conn.close()
+            os.remove(restore_file)
+            return
+
         restore_cursor.execute("SELECT * FROM messages")
         rows = restore_cursor.fetchall()
         restore_conn.close()
@@ -409,9 +429,11 @@ async def restore_db(update: Update, context: CallbackContext) -> None:
         return
 
     try:
+        # Insert rows from the backup file into the current database.
+        # Using INSERT OR IGNORE to prevent duplicates based on unique constraints if any.
         for row in rows:
             cursor.execute("""
-                INSERT INTO messages (user_id, username, chat_id, message, date)
+                INSERT OR IGNORE INTO messages (user_id, username, chat_id, message, date)
                 VALUES (?, ?, ?, ?, ?)
             """, row[1:])
         conn.commit()
@@ -425,7 +447,7 @@ async def restore_db(update: Update, context: CallbackContext) -> None:
 
 async def stats(update: Update, context: CallbackContext) -> None:
     """
-    نمایش آمار کلی ربات شامل تعداد پیام‌ها، تعداد کاربران منحصربه‌فرد، 5 کاربر برتر و زمان فعال بودن.
+    Show overall bot statistics including total messages, unique users, top 5 users, and uptime.
     """
     if not update.message:
         return
@@ -484,7 +506,7 @@ async def stats(update: Update, context: CallbackContext) -> None:
 
 async def list_files(update: Update, context: CallbackContext) -> None:
     """
-    نمایش لیست فایل‌های ذخیره‌شده مجاز.
+    List all allowed files stored in the current directory.
     """
     if not update.message:
         return
@@ -503,7 +525,7 @@ async def list_files(update: Update, context: CallbackContext) -> None:
 
 async def get_file_command(update: Update, context: CallbackContext) -> None:
     """
-    ارسال فایل مورد نظر به عنوان داکیومنت (فقط فایل‌های مجاز).
+    Send the requested file as a document (only allowed files).
     """
     if not update.message:
         return
@@ -529,16 +551,22 @@ async def get_file_command(update: Update, context: CallbackContext) -> None:
 
 async def get_info(update: Update, context: CallbackContext) -> None:
     """
-    دریافت اطلاعات عمومی کاربر (مانند first_name، last_name، username، id) با استفاده از دستور /get_info <query>.
-    توجه: اطلاعات حساس (مانند شماره تلفن، تاریخ تولد، تاریخ جوین شدن) به دلیل محدودیت‌های API قابل دسترسی نیستند.
+    Retrieve public information about a user using /get_info <query>.
+    Only public data (first_name, last_name, username, id) is returned.
+    Note: Due to Telegram API restrictions, the user must have at least once started a conversation with the bot.
     """
     if not update.message:
         return
     if not context.args:
-        await update.message.reply_text("❌ Please provide a Telegram username (e.g. @username) or phone number.")
+        await update.message.reply_text("❌ Please provide a Telegram username (e.g. @username).")
         return
 
     query = context.args[0].strip()
+    # Only allow queries starting with '@'
+    if not query.startswith('@'):
+        await update.message.reply_text("❌ Retrieving information by phone number is not supported. Please provide a username starting with '@'.")
+        return
+
     try:
         chat = await context.bot.get_chat(query)
         info_text = "👤 <b>User Information:</b>\n\n"
@@ -548,8 +576,14 @@ async def get_info(update: Update, context: CallbackContext) -> None:
         if chat.username:
             info_text += f"🔹 Username: @{chat.username}\n"
         info_text += f"💡 ID: {chat.id}\n\n"
-        info_text += "ℹ️ Note: Due to Telegram API restrictions, sensitive details such as phone number, join date, or birth date are not available."
+        info_text += "ℹ️ Note: Only public information is available. If the user hasn't interacted with the bot, no additional info will be returned."
         await update.message.reply_text(info_text, parse_mode=ParseMode.HTML)
+    except BadRequest as e:
+        error_msg = str(e).lower()
+        if "chat not found" in error_msg:
+            await update.message.reply_text("❌ Chat not found. This may be because the user hasn't started a conversation with the bot or the username is incorrect.")
+        else:
+            await update.message.reply_text(f"❌ Error retrieving information: {e}")
     except Exception as e:
         await update.message.reply_text(f"❌ Error retrieving information: {e}")
 
