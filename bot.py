@@ -25,6 +25,9 @@ DB_PATH = "bot_data.db"
 
 # ---------------- Initialize Database ----------------
 def init_db(db_path: str) -> sqlite3.Connection:
+    """
+    Connect to the SQLite database and create the messages table if it does not exist.
+    """
     try:
         conn = sqlite3.connect(db_path, check_same_thread=False)
         cursor = conn.cursor()
@@ -82,50 +85,59 @@ def list_allowed_files() -> list:
 
 # ---------------- Command Handlers ----------------
 async def start(update: Update, context: CallbackContext) -> None:
+    """
+    Handles the /start command: sends a welcome message with an overview of the bot features.
+    """
     if not update.message:
         return
     try:
         await update.message.reply_text(
             "سلام! 🤖 من ربات جامع هستم.\n"
-            "✅ تمامی پیام‌ها ثبت می‌شوند.\n"
-            "برای دریافت داده‌ها، دستور /show_data را ارسال کنید.\n"
-            "برای مشاهده راهنما، دستور /help را وارد کنید.\n\n"
-            "برای فعال کردن حالت ریپلای در این چت:\n"
-            "🔹 /reply : تنظیم متن ریپلای (تنها ادمین)\n"
-            "🔹 /endreply : پایان حالت ریپلای\n\n"
+            "✅ تمامی پیام‌ها ثبت می‌شوند.\n\n"
+            "برای دریافت داده‌ها:\n"
+            "➖ /show_data - نمایش پیام‌های ثبت‌شده (فقط برای ادمین، 50 پیام اخیر).\n"
+            "➖ /stats - نمایش آمار کلی ربات.\n\n"
+            "برای مدیریت ریپلای در این چت:\n"
+            "➖ /reply - فعال کردن حالت ریپلای (تنها ادمین).\n"
+            "➖ /endreply - پایان حالت ریپلای.\n\n"
             "برای مدیریت ادمین‌ها:\n"
-            "🔸 /add_admin [user_id یا @username]\n"
-            "🔸 /remove_admin [user_id یا @username] (ادمین اصلی قابل حذف نیست)\n"
-            "🔸 /list_admins : نمایش ادمین‌های فعلی\n\n"
+            "➖ /add_admin [user_id یا @username]\n"
+            "➖ /remove_admin [user_id یا @username] (ادمین اصلی قابل حذف نیست).\n"
+            "➖ /list_admins - نمایش لیست ادمین‌های ثبت‌شده.\n\n"
             "🔧 امکانات جدید:\n"
-            "➖ /backup : بکاپ‌گیری از دیتابیس و ارسال آن به تلگرام.\n"
-            "➖ /restore : بازیابی دیتابیس از فایل بکاپ ارسال‌شده.\n"
-            "➖ /stats : نمایش آمار کلی ربات.\n"
-            "➖ /list_files : نمایش فایل‌های ذخیره‌شده مجاز.\n"
-            "➖ /get_file <filename> : ارسال فایل مورد نظر به عنوان داکیومنت."
+            "➖ /backup - بکاپ‌گیری از دیتابیس و ارسال آن به تلگرام.\n"
+            "➖ /restore - ریستور دیتابیس از فایل بکاپ ارسال‌شده.\n"
+            "➖ /list_files - نمایش فایل‌های ذخیره‌شده مجاز.\n"
+            "➖ /get_file <filename> - ارسال فایل مورد نظر به عنوان داکیومنت.\n"
+            "➖ /get_info <username یا شماره تلفن> - دریافت اطلاعات عمومی کاربر.\n\n"
+            "برای مشاهده راهنمای کامل دستورات، از /help استفاده کنید."
         )
     except Exception as e:
         logging.error(f"Error in start command: {e}")
 
 async def help_command(update: Update, context: CallbackContext) -> None:
+    """
+    Sends a detailed help message with a list of all available commands.
+    """
     if not update.message:
         return
     help_text = (
-        "📚 <b>راهنمای ربات جامع</b>\n\n"
-        "➖ <b>/start</b>: خوش‌آمدگویی و معرفی ربات.\n"
-        "➖ <b>/help</b>: نمایش راهنمای کامل دستورات.\n"
-        "➖ <b>/show_data</b>: نمایش تمامی پیام‌های ثبت‌شده (فقط برای ادمین).\n"
-        "➖ <b>/reply</b>: فعال‌سازی حالت ریپلای (تنها ادمین)؛ پیام بعدی ادمین، متن ریپلای خواهد شد.\n"
-        "➖ <b>/endreply</b>: پایان حالت ریپلای (تنها ادمین).\n"
-        "➖ <b>/add_admin [user_id یا @username]</b>: اضافه کردن یک ادمین جدید (فقط توسط ادمین‌ها).\n"
-        "➖ <b>/remove_admin [user_id یا @username]</b>: حذف یک ادمین (فقط توسط ادمین‌ها؛ ادمین اصلی قابل حذف نیست).\n"
-        "➖ <b>/list_admins</b>: نمایش لیست ادمین‌های ثبت‌شده.\n\n"
-        "🔧 <b>امکانات جدید:</b>\n"
-        "➖ <b>/backup</b>: بکاپ‌گیری از دیتابیس؛ فایل بکاپ ایجاد شده و به شما ارسال می‌شود.\n"
-        "➖ <b>/restore</b>: ریستور دیتابیس؛ فایل بکاپ را به عنوان داکیومنت ارسال کنید.\n"
-        "➖ <b>/stats</b>: نمایش آمار کلی ربات شامل تعداد کل پیام‌ها، تعداد کاربران منحصربه‌فرد، ۵ کاربر برتر و زمان فعال بودن ربات.\n"
-        "➖ <b>/list_files</b>: نمایش لیست فایل‌های ذخیره‌شده مجاز.\n"
-        "➖ <b>/get_file &lt;filename&gt;</b>: ارسال فایل مورد نظر (در صورت موجود بودن) به شما."
+        "📚 <b>راهنمای کامل ربات جامع</b>\n\n"
+        "1. <b>/start</b>: معرفی ربات و نمایش ویژگی‌ها.\n"
+        "2. <b>/help</b>: نمایش راهنمای کامل دستورات.\n"
+        "3. <b>/show_data</b>: نمایش 50 پیام ثبت‌شده (فقط برای ادمین).\n"
+        "4. <b>/stats</b>: نمایش آمار کلی ربات شامل تعداد پیام‌ها، کاربران منحصربه‌فرد، 5 کاربر برتر و زمان فعال بودن.\n"
+        "5. <b>/reply</b>: فعال کردن حالت ریپلای (تنها ادمین). پیام بعدی به عنوان ریپلای ارسال می‌شود.\n"
+        "6. <b>/endreply</b>: پایان حالت ریپلای.\n"
+        "7. <b>/add_admin [user_id یا @username]</b>: اضافه کردن ادمین جدید (فقط توسط ادمین‌ها).\n"
+        "8. <b>/remove_admin [user_id یا @username]</b>: حذف یک ادمین (ادمین اصلی قابل حذف نیست).\n"
+        "9. <b>/list_admins</b>: نمایش لیست ادمین‌های ثبت‌شده.\n"
+        "10. <b>/backup</b>: بکاپ‌گیری از دیتابیس و ارسال فایل بکاپ.\n"
+        "11. <b>/restore</b>: ریستور دیتابیس از فایل بکاپ ارسال‌شده.\n"
+        "12. <b>/list_files</b>: نمایش لیست فایل‌های ذخیره‌شده مجاز (مثلاً بکاپ‌ها، اکسل، نمودار).\n"
+        "13. <b>/get_file &lt;filename&gt;</b>: دریافت فایل مورد نظر (در صورت موجود بودن و مجاز بودن).\n"
+        "14. <b>/get_info &lt;username یا شماره تلفن&gt;</b>: دریافت اطلاعات عمومی کاربر (فقط اطلاعات عمومی مانند نام، نام خانوادگی، یوزرنیم و شناسه).\n\n"
+        "💡 توجه: دسترسی به برخی دستورات فقط برای ادمین‌ها مجاز است."
     )
     try:
         await update.message.reply_text(help_text, parse_mode=ParseMode.HTML)
@@ -133,17 +145,20 @@ async def help_command(update: Update, context: CallbackContext) -> None:
         logging.error(f"Error in help command: {e}")
 
 async def handle_message(update: Update, context: CallbackContext) -> None:
+    """
+    ذخیره پیام‌های دریافتی در دیتابیس و ارسال ریپلای در صورت فعال بودن حالت ریپلای.
+    """
     if not update.message:
         return
     try:
-        # Check for reply mode setting
+        # بررسی حالت ریپلای (تنها برای ادمین‌ها)
         if context.chat_data.get("awaiting_reply_text") and update.message.from_user.id in admins:
             context.chat_data["reply_text"] = update.message.text
             context.chat_data.pop("awaiting_reply_text")
             await update.message.reply_text(f"✅ Reply mode activated.\nReply: {update.message.text}")
             return
 
-        # Save message to database
+        # ذخیره پیام در دیتابیس
         user = update.message.from_user
         chat_id = update.message.chat_id
         message_text = update.message.text
@@ -157,7 +172,7 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
         except Exception as db_error:
             logging.error(f"Database error while inserting message: {db_error}")
 
-        # Send reply if reply mode is active
+        # ارسال ریپلای در صورت فعال بودن
         if "reply_text" in context.chat_data:
             try:
                 await update.message.reply_text(
@@ -170,6 +185,9 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
         logging.error(f"Error in handle_message: {e}")
 
 async def show_data(update: Update, context: CallbackContext) -> None:
+    """
+    نمایش آخرین 50 پیام ثبت‌شده در دیتابیس (فقط برای ادمین‌ها).
+    """
     if not update.message:
         return
     user_id = update.message.from_user.id
@@ -182,6 +200,7 @@ async def show_data(update: Update, context: CallbackContext) -> None:
             SELECT user_id, username, chat_id, message, date 
             FROM messages
             ORDER BY id DESC
+            LIMIT 50
         """)
         rows = cursor.fetchall()
     except Exception as e:
@@ -192,7 +211,7 @@ async def show_data(update: Update, context: CallbackContext) -> None:
     if not rows:
         response = "📭 No messages have been recorded."
     else:
-        response = "📌 <b>All Recorded Messages:</b>\n\n"
+        response = "📌 <b>Last 50 Recorded Messages:</b>\n\n"
         for row in rows:
             response += (
                 f"👤 <b>UserID:</b> {row[0]}\n"
@@ -213,6 +232,9 @@ async def show_data(update: Update, context: CallbackContext) -> None:
         logging.error(f"Error sending data message: {e}")
 
 async def reply_command(update: Update, context: CallbackContext) -> None:
+    """
+    فعال‌سازی حالت ریپلای برای ادمین‌ها؛ پیام بعدی به عنوان ریپلای ثبت خواهد شد.
+    """
     if not update.message:
         return
     if update.message.from_user.id not in admins:
@@ -222,6 +244,9 @@ async def reply_command(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text("📝 Please send the reply text or emoji.")
 
 async def endreply_command(update: Update, context: CallbackContext) -> None:
+    """
+    پایان حالت ریپلای برای ادمین‌ها.
+    """
     if not update.message:
         return
     if update.message.from_user.id not in admins:
@@ -234,6 +259,9 @@ async def endreply_command(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("ℹ️ Reply mode is not active.")
 
 async def add_admin(update: Update, context: CallbackContext) -> None:
+    """
+    اضافه کردن یک ادمین جدید. فقط توسط ادمین‌های فعلی مجاز است.
+    """
     if not update.message:
         return
     if update.message.from_user.id not in admins:
@@ -272,6 +300,9 @@ async def add_admin(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text(f"✅ User {new_admin} has been added as an admin.")
 
 async def remove_admin(update: Update, context: CallbackContext) -> None:
+    """
+    حذف یک ادمین از لیست. تنها ادمین‌های فعلی مجاز به حذف هستند.
+    """
     if not update.message:
         return
     if update.message.from_user.id not in admins:
@@ -310,20 +341,24 @@ async def remove_admin(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("ℹ️ This user is not in the admin list.")
 
 async def list_admins(update: Update, context: CallbackContext) -> None:
+    """
+    نمایش لیست ادمین‌های ثبت‌شده.
+    """
     if not update.message:
         return
     if not admins:
         await update.message.reply_text("ℹ️ No admins are registered.")
         return
-    response = "👥 <b>Admin List:</b>\n\n"
-    for admin in admins:
-        response += f"• {admin}\n"
+    response = "👥 <b>Admin List:</b>\n\n" + "\n".join(f"• {admin}" for admin in admins)
     try:
         await update.message.reply_text(response, parse_mode=ParseMode.HTML)
     except Exception as e:
         logging.error(f"Error in list_admins: {e}")
 
 async def backup_db(update: Update, context: CallbackContext) -> None:
+    """
+    بکاپ‌گیری از دیتابیس و ارسال فایل بکاپ به ادمین.
+    """
     if not update.message:
         return
     if update.message.from_user.id not in admins:
@@ -332,7 +367,8 @@ async def backup_db(update: Update, context: CallbackContext) -> None:
     try:
         backup_filename = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
         shutil.copy(DB_PATH, backup_filename)
-        await update.message.reply_document(document=open(backup_filename, "rb"))
+        with open(backup_filename, "rb") as backup_file:
+            await update.message.reply_document(document=backup_file)
         os.remove(backup_filename)
         logging.info("Database backup completed successfully.")
     except Exception as e:
@@ -340,6 +376,9 @@ async def backup_db(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ Error creating database backup.")
 
 async def restore_db(update: Update, context: CallbackContext) -> None:
+    """
+    ریستور دیتابیس از فایل بکاپ ارسال‌شده.
+    """
     if not update.message:
         return
     if update.message.from_user.id not in admins:
@@ -385,6 +424,9 @@ async def restore_db(update: Update, context: CallbackContext) -> None:
             os.remove(restore_file)
 
 async def stats(update: Update, context: CallbackContext) -> None:
+    """
+    نمایش آمار کلی ربات شامل تعداد پیام‌ها، تعداد کاربران منحصربه‌فرد، 5 کاربر برتر و زمان فعال بودن.
+    """
     if not update.message:
         return
     try:
@@ -440,8 +482,10 @@ async def stats(update: Update, context: CallbackContext) -> None:
     except Exception as e:
         logging.error(f"Error sending stats: {e}")
 
-# ---------------- New Commands: List and Get Files ----------------
 async def list_files(update: Update, context: CallbackContext) -> None:
+    """
+    نمایش لیست فایل‌های ذخیره‌شده مجاز.
+    """
     if not update.message:
         return
     if update.message.from_user.id not in admins:
@@ -458,6 +502,9 @@ async def list_files(update: Update, context: CallbackContext) -> None:
         logging.error(f"Error in list_files: {e}")
 
 async def get_file_command(update: Update, context: CallbackContext) -> None:
+    """
+    ارسال فایل مورد نظر به عنوان داکیومنت (فقط فایل‌های مجاز).
+    """
     if not update.message:
         return
     if update.message.from_user.id not in admins:
@@ -474,17 +521,16 @@ async def get_file_command(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("❌ File not found.")
         return
     try:
-        await update.message.reply_document(document=open(filename, "rb"))
+        with open(filename, "rb") as f:
+            await update.message.reply_document(document=f)
     except Exception as e:
         logging.error(f"Error sending file {filename}: {e}")
         await update.message.reply_text("❌ Error sending the file.")
 
-# ---------------- دریافت اطلاعات کاربر (اطلاعات عمومی) ----------------
 async def get_info(update: Update, context: CallbackContext) -> None:
     """
-    با استفاده از دستور /get_info <query> (یوزرنیم یا شماره تلفن) سعی در دریافت
-    اطلاعات عمومی کاربر از طریق متد get_chat دارد. توجه داشته باشید که تنها اطلاعات
-    عمومی مانند first_name، last_name، username و id در دسترس است.
+    دریافت اطلاعات عمومی کاربر (مانند first_name، last_name، username، id) با استفاده از دستور /get_info <query>.
+    توجه: اطلاعات حساس (مانند شماره تلفن، تاریخ تولد، تاریخ جوین شدن) به دلیل محدودیت‌های API قابل دسترسی نیستند.
     """
     if not update.message:
         return
@@ -494,7 +540,6 @@ async def get_info(update: Update, context: CallbackContext) -> None:
 
     query = context.args[0].strip()
     try:
-        # تلاش برای دریافت اطلاعات از طریق get_chat
         chat = await context.bot.get_chat(query)
         info_text = "👤 <b>User Information:</b>\n\n"
         info_text += f"👤 First Name: {chat.first_name}\n"
@@ -507,10 +552,6 @@ async def get_info(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text(info_text, parse_mode=ParseMode.HTML)
     except Exception as e:
         await update.message.reply_text(f"❌ Error retrieving information: {e}")
-
-# ---------------- Register the new handler ----------------
-bot.add_handler(CommandHandler("get_info", get_info))
-
 
 # ---------------- Register Handlers ----------------
 bot.add_handler(CommandHandler("start", start))
@@ -526,6 +567,7 @@ bot.add_handler(CommandHandler("restore", restore_db))
 bot.add_handler(CommandHandler("stats", stats))
 bot.add_handler(CommandHandler("list_files", list_files))
 bot.add_handler(CommandHandler("get_file", get_file_command))
+bot.add_handler(CommandHandler("get_info", get_info))
 bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 # ---------------- Run Bot ----------------
